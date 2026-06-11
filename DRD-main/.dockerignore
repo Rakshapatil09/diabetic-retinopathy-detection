@@ -1,0 +1,16 @@
+/.venv
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+*.so
+*.log
+.env
+.git
+*.gitignore
+.vscode
+data/
+archive/*.h5
+archive/my_saved_model.h5
+my_saved_model.h5
+*.ipynb
