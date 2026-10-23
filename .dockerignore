@@ -9,12 +9,13 @@ __pycache__
 .git
 *.gitignore
 .vscode
+.claude
 data/
-archive/
 dataset_merged/
 synthetic_images/
 lora_models/
-archive/*.h5
-archive/my_saved_model.h5
-my_saved_model.h5
 *.ipynb
+status.txt
+# Keep only the app's model from archive/
+archive/*
+!archive/my_saved_model.h5

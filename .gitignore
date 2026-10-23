@@ -1,0 +1,24 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+.vscode/
+.claude/
+*.ipynb
+.DS_Store
+node_modules/
+venv/
+
+# Datasets (kept locally, not in the repo)
+archive/colored_images/
+dataset_merged/
+synthetic_images/
+
+# Model files: only the app's model is tracked (via Git LFS, see .gitattributes)
+archive/*.h5
+!archive/my_saved_model.h5
+/my_saved_model.h5
+
+# Local logs / scratch output
+*.log
+status.txt
