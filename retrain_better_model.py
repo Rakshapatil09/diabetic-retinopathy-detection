@@ -11,6 +11,7 @@ from sklearn.utils.class_weight import compute_class_weight
 import numpy as np
 from sklearn.metrics import confusion_matrix, classification_report
 import os
+from data_split import make_generators
 
 # Fix for Unicode issues
 import sys
@@ -26,10 +27,9 @@ batch_size = 32
 epochs = int(os.environ.get("EPOCHS", 50))  # More epochs (override with EPOCHS env var)
 num_classes = 5
 
-# Enhanced Image Generators with more augmentation
+# Enhanced Image Generators with more augmentation (training only)
 train_datagen = ImageDataGenerator(
     rescale=1./255,
-    validation_split=0.2,
     rotation_range=30,
     width_shift_range=0.3,
     height_shift_range=0.3,
@@ -40,28 +40,18 @@ train_datagen = ImageDataGenerator(
     brightness_range=[0.8, 1.2],
     fill_mode='nearest'
 )
+# Validation images are only rescaled, so val metrics are stable between epochs
+val_datagen = ImageDataGenerator(rescale=1./255)
 
-train_generator = train_datagen.flow_from_directory(
-    data_dir,
-    target_size=(img_height, img_width),
-    batch_size=batch_size,
-    class_mode='categorical',
-    subset='training',
-    shuffle=True
-)
-
-validation_generator = train_datagen.flow_from_directory(
-    data_dir,
-    target_size=(img_height, img_width),
-    batch_size=batch_size,
-    class_mode='categorical',
-    subset='validation',
-    shuffle=False  # keep order aligned with validation_generator.classes for evaluation
+# Split per original image so balance_dataset.py copies can't leak into validation
+train_generator, validation_generator = make_generators(
+    data_dir, train_datagen, val_datagen,
+    target_size=(img_height, img_width), batch_size=batch_size
 )
 
 # Print class mapping
 print("Class mapping:")
-for idx, class_name in train_generator.class_indices.items():
+for class_name, idx in train_generator.class_indices.items():
     print(f"{class_name} -> {idx}")
 
 # Compute class weights
@@ -131,7 +121,7 @@ if resume_path:
         metrics=['accuracy']
     )
 
-print(f"\nModel summary:")
+print("\nModel summary:")
 model.summary()
 
 # Callbacks
@@ -143,7 +133,7 @@ callbacks = [
 ]
 
 # Train
-print(f"\nStarting training...")
+print("\nStarting training...")
 history = model.fit(
     train_generator,
     validation_data=validation_generator,
@@ -154,10 +144,9 @@ history = model.fit(
 )
 
 # Evaluate
-print(f"\nEvaluating model...")
-val_steps = validation_generator.samples // validation_generator.batch_size
+print("\nEvaluating model...")
 validation_generator.reset()
-preds = model.predict(validation_generator, steps=val_steps, verbose=1)
+preds = model.predict(validation_generator, verbose=1)
 y_pred = np.argmax(preds, axis=1)
 y_true = validation_generator.classes[:len(y_pred)]
 
@@ -174,4 +163,4 @@ try:
 except Exception as e:
     print(f"❌ Failed to save model: {e}")
 
-print(f"\nTraining completed! Use the improved model in your app.")
+print("\nTraining completed! Use the improved model in your app.")

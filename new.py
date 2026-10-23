@@ -12,8 +12,6 @@ from tensorflow.keras.layers import *
 from tensorflow.keras.models import Model, load_model
 from tensorflow.keras.initializers import glorot_uniform
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
-from jupyterthemes import jtplot
-from IPython.display import display
 import tkinter as tk
 from tkinter import filedialog
 
@@ -34,8 +32,8 @@ def browse_image():
 
 # Function to preprocess an image
 def preprocess_image(image_path):
-    img = Image.open(image_path)
-    img = img.resize((256, 256))
+    img = Image.open(image_path).convert("RGB")
+    img = img.resize((224, 224))
     img_array = np.array(img)
     img_array = img_array / 255.0
     img_array = np.expand_dims(img_array, axis=0)
@@ -67,7 +65,7 @@ def update_prediction():
         uploaded_image_path = browse_image()
         if uploaded_image_path:
             # Load the trained model
-            model = load_model(os.path.join(os.path.dirname(os.path.abspath(__file__)), "my_saved_model.h5"))
+            model = load_model(os.path.join(os.path.dirname(os.path.abspath(__file__)), "archive", "my_saved_model.h5"))
 
 
             # Get prediction and confidence scores

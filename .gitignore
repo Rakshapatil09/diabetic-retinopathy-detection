@@ -22,3 +22,6 @@ archive/*.h5
 # Local logs / scratch output
 *.log
 status.txt
+
+# Editor scratch files
+tempCodeRunnerFile.*

@@ -2,12 +2,12 @@ import tensorflow as tf
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from tensorflow.keras.models import Sequential, Model
 from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Dropout, GlobalAveragePooling2D
-from tensorflow.keras.applications.resnet import preprocess_input
 from sklearn.utils.class_weight import compute_class_weight
 import numpy as np
 from sklearn.metrics import confusion_matrix, classification_report
 import os
 import sys
+from data_split import make_generators
 
 # Set random seed for reproducibility
 tf.random.set_seed(42)
@@ -26,37 +26,27 @@ os.makedirs(os.path.dirname(model_save_path), exist_ok=True)
 # === Parameters ===
 img_height, img_width = 224, 224
 batch_size = 32
-epochs = 10
+epochs = int(os.environ.get("EPOCHS", 50))
 num_classes = 5  # DR has 5 classes
 
 # === Image Generators ===
+# Scale to [0, 1] to match the preprocessing in app3.py (augmentation on training only)
 train_datagen = ImageDataGenerator(
-    validation_split=0.2,
+    rescale=1./255,
     rotation_range=10,
     width_shift_range=0.1,
     height_shift_range=0.1,
     shear_range=0.1,
     zoom_range=0.1,
     horizontal_flip=True,
-    fill_mode='nearest',
-    preprocessing_function=preprocess_input  # ResNet preprocessing
+    fill_mode='nearest'
 )
+val_datagen = ImageDataGenerator(rescale=1./255)
 
-train_generator = train_datagen.flow_from_directory(
-    data_dir,
-    target_size=(img_height, img_width),
-    batch_size=batch_size,
-    class_mode='categorical',
-    subset='training',
-    shuffle=True
-)
-
-validation_generator = train_datagen.flow_from_directory(
-    data_dir,
-    target_size=(img_height, img_width),
-    batch_size=batch_size,
-    class_mode='categorical',
-    subset='validation'
+# Split per original image so balance_dataset.py copies can't leak into validation
+train_generator, validation_generator = make_generators(
+    data_dir, train_datagen, val_datagen,
+    target_size=(img_height, img_width), batch_size=batch_size
 )
 
 # === Compute class weights ===
@@ -101,13 +91,13 @@ model.compile(
 history = model.fit(
     train_generator,
     validation_data=validation_generator,
-    epochs=50,  # More epochs for custom model
+    epochs=epochs,
+    class_weight=class_weights_dict,
 )
 
 # === Evaluate and print confusion matrix ===
-val_steps = validation_generator.samples // validation_generator.batch_size
 validation_generator.reset()
-preds = model.predict(validation_generator, steps=val_steps, verbose=1)
+preds = model.predict(validation_generator, verbose=1)
 y_pred = np.argmax(preds, axis=1)
 y_true = validation_generator.classes[:len(y_pred)]
 

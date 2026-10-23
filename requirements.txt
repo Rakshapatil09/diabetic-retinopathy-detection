@@ -1,8 +1,9 @@
 # Core runtime
+# TensorFlow is not listed: the Docker image (tensorflow/tensorflow) provides it.
+# For local runs install it too:  pip install tensorflow
 streamlit>=1.10.0
 pillow
 numpy
+pandas
 matplotlib
 scikit-learn
-jupyterthemes
-ipython

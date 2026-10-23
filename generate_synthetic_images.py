@@ -15,15 +15,22 @@ def ensure_directory(path: str) -> None:
 def main() -> None:
     ensure_directory(OUTPUT_BASE)
 
+    # Use an NVIDIA GPU or Apple Silicon GPU (Metal) if available
+    if torch.cuda.is_available():
+        device = "cuda"
+    elif torch.backends.mps.is_available():
+        device = "mps"
+    else:
+        device = "cpu"
+    # float16 isn't supported for most ops on CPU
+    dtype = torch.float32 if device == "cpu" else torch.float16
+
     pipe = StableDiffusionPipeline.from_pretrained(
         "runwayml/stable-diffusion-v1-5",
-        torch_dtype=torch.float16,
+        torch_dtype=dtype,
         safety_checker=None,
     )
     pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
-
-    # Use Apple Silicon GPU (Metal) if available
-    device = "mps" if torch.backends.mps.is_available() else "cpu"
     pipe.to(device)
 
     for class_name in CLASSES:
@@ -44,6 +51,8 @@ def main() -> None:
             out_path = os.path.join(class_output_dir, f"{class_name}_{i + 1:04d}.png")
             image.save(out_path)
         print(f"[DONE] Generated {num_images} images for {class_name}")
+        # Remove this class's LoRA before loading the next one
+        pipe.unload_lora_weights()
 
 
 if __name__ == "__main__":

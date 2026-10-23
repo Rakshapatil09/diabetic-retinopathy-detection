@@ -4,12 +4,12 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from tensorflow.keras.applications import EfficientNetB0
-from tensorflow.keras.applications.efficientnet import preprocess_input
-from tensorflow.keras.layers import GlobalAveragePooling2D, Dense, Dropout, Input
+from tensorflow.keras.layers import GlobalAveragePooling2D, Dense, Dropout, Input, Rescaling
 from tensorflow.keras.models import Model
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLROnPlateau
 from sklearn.utils.class_weight import compute_class_weight
 from sklearn.metrics import confusion_matrix, classification_report
+from data_split import make_generators
 
 
 # Fix stdout encoding on some environments
@@ -29,9 +29,10 @@ EPOCHS = 50
 
 
 # Data Generators
+# Images are scaled to [0, 1] to match app3.py; the model rescales back to the
+# [0, 255] range EfficientNet expects (see the Rescaling layer below).
 train_datagen = ImageDataGenerator(
-    preprocessing_function=preprocess_input,
-    validation_split=0.2,
+    rescale=1./255,
     rotation_range=20,
     width_shift_range=0.2,
     height_shift_range=0.2,
@@ -40,23 +41,11 @@ train_datagen = ImageDataGenerator(
     horizontal_flip=True,
     fill_mode='nearest'
 )
+val_datagen = ImageDataGenerator(rescale=1./255)
 
-train_gen = train_datagen.flow_from_directory(
-    DATA_DIR,
-    target_size=IMG_SIZE,
-    batch_size=BATCH_SIZE,
-    class_mode='categorical',
-    subset='training',
-    shuffle=True
-)
-
-val_gen = train_datagen.flow_from_directory(
-    DATA_DIR,
-    target_size=IMG_SIZE,
-    batch_size=BATCH_SIZE,
-    class_mode='categorical',
-    subset='validation'
-)
+# Split per original image so balance_dataset.py copies can't leak into validation
+train_gen, val_gen = make_generators(DATA_DIR, train_datagen, val_datagen,
+                                     target_size=IMG_SIZE, batch_size=BATCH_SIZE)
 
 
 # Class weights
@@ -67,14 +56,16 @@ class_weights_dict = dict(enumerate(class_weights))
 
 
 # Model
-base_model = EfficientNetB0(include_top=False, weights='imagenet', input_tensor=Input(shape=(*IMG_SIZE, 3)))
+base_model = EfficientNetB0(include_top=False, weights='imagenet', input_shape=(*IMG_SIZE, 3))
 base_model.trainable = False  # first stage: freeze
 
-x = base_model.output
+inputs = Input(shape=(*IMG_SIZE, 3))
+x = Rescaling(255.0)(inputs)  # app feeds [0, 1]; EfficientNet expects [0, 255]
+x = base_model(x, training=False)  # keep BatchNorm in inference mode while fine-tuning
 x = GlobalAveragePooling2D()(x)
 x = Dropout(0.4)(x)
 outputs = Dense(train_gen.num_classes, activation='softmax')(x)
-model = Model(inputs=base_model.input, outputs=outputs)
+model = Model(inputs=inputs, outputs=outputs)
 
 model.compile(optimizer=tf.keras.optimizers.Adam(1e-3), loss='categorical_crossentropy', metrics=['accuracy'])
 
@@ -114,9 +105,8 @@ history_ft = model.fit(
 
 
 # Evaluate
-val_steps = val_gen.samples // val_gen.batch_size
 val_gen.reset()
-preds = model.predict(val_gen, steps=val_steps, verbose=1)
+preds = model.predict(val_gen, verbose=1)
 y_pred = np.argmax(preds, axis=1)
 y_true = val_gen.classes[:len(y_pred)]
 print('Confusion Matrix:')

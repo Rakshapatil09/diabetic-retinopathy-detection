@@ -7,12 +7,22 @@ from tensorflow.keras.models import load_model
 # === Load model ===
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_PATH = os.path.join(BASE_DIR, "archive", "my_saved_model.h5")
-if os.path.exists(MODEL_PATH):
-    model = load_model(MODEL_PATH)
-    st.success("Model loaded successfully")
-else:
+
+
+@st.cache_resource
+def get_model():
+    # Cached so the model is loaded once per server, not on every interaction
+    return load_model(MODEL_PATH)
+
+
+if not os.path.exists(MODEL_PATH):
     st.error("Model file not found")
     st.stop()
+# A Git LFS pointer (a few hundred bytes) means the real model was never downloaded
+if os.path.getsize(MODEL_PATH) < 1024 * 1024:
+    st.error("Model file is a Git LFS pointer, not the model. Run `git lfs pull` to download it.")
+    st.stop()
+model = get_model()
 
 # === Class labels ===
 # Alphabetical: Mild, Moderate, No_DR, Proliferate_DR, Severe
@@ -52,9 +62,8 @@ def predict_uploaded_image(image_file):
     predicted_index = np.argmax(prediction)
     predicted_class = diagnosis_labels[predicted_index]
     confidence = np.max(prediction) * 100
-    # Debug: print predictions
-    st.write(f"Predicted index: {predicted_index}")
-    st.write(f"Prediction probabilities: {prediction[0]}")
+    with st.expander("Class probabilities"):
+        st.write({diagnosis_labels[i]: f"{p * 100:.2f}%" for i, p in enumerate(prediction[0])})
     return predicted_class, confidence
 
 # === Global styles (gradient background, glass card, modern buttons) ===
@@ -118,18 +127,13 @@ def inject_global_styles():
 # === Streamlit App ===
 def main():
     inject_global_styles()
-    st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
     st.markdown("<div class='app-title'>Diabetic Retinopathy Detection</div>", unsafe_allow_html=True)
     st.markdown("<div class='app-subtitle'>Upload a retinal fundus image to predict the stage of Diabetic Retinopathy</div>", unsafe_allow_html=True)
 
     uploaded_image = st.file_uploader("Upload a retinal fundus image", type=["jpg", "jpeg", "png"])
 
     if uploaded_image is not None:
-        st.markdown("""
-        <div style='background-color: white; padding: 10px; border-radius: 10px; display: inline-block;'>
-        """, unsafe_allow_html=True)
         st.image(uploaded_image, width=400, caption="Uploaded Image")
-        st.markdown("</div>", unsafe_allow_html=True)
         if st.button("Predict"):
             prediction, confidence = predict_uploaded_image(uploaded_image)
             st.markdown(f"""
@@ -140,10 +144,9 @@ def main():
 """, unsafe_allow_html=True)
             st.markdown(f"""
 <div style='padding: 1rem; border-radius: 10px; background: #fffbe6; border: 2px solid #ffe58f; text-align: center; margin-top: 1rem;'>
-    <span style='font-size:1.5rem; font-weight: bold; color: #faad14;'>Confidence: {confidence:.2f}</span>
+    <span style='font-size:1.5rem; font-weight: bold; color: #faad14;'>Confidence: {confidence:.2f}%</span>
 </div>
 """, unsafe_allow_html=True)
-    st.markdown("</div>", unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()

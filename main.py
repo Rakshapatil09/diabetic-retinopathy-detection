@@ -4,7 +4,7 @@ import tensorflow as tf
 from tensorflow import keras
 import os
 import matplotlib.pyplot as plt
-import PIL
+import PIL.Image
 from sklearn.model_selection import train_test_split
 from sklearn.utils import shuffle
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
@@ -12,8 +12,6 @@ from tensorflow.keras.layers import *
 from tensorflow.keras.models import Model, load_model
 from tensorflow.keras.initializers import glorot_uniform
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
-from jupyterthemes import jtplot
-from IPython.display import display
 import tkinter as tk
 from tkinter import filedialog
 
@@ -24,16 +22,16 @@ def browse_image():
 
 # Function to preprocess an image
 def preprocess_image(image_path):
-    img = PIL.Image.open(image_path)
-    img = img.resize((256, 256))
+    img = PIL.Image.open(image_path).convert("RGB")
+    img = img.resize((224, 224))
     img_array = np.array(img)
     img_array = img_array / 255.0  # Normalize the image
     img_array = np.expand_dims(img_array, axis=0)
     return img_array
 
 # Function to resize and preprocess an image
-def resize_and_preprocess_image(image_path, target_size=(256, 256)):
-    img = PIL.Image.open(image_path)
+def resize_and_preprocess_image(image_path, target_size=(224, 224)):
+    img = PIL.Image.open(image_path).convert("RGB")
     img = img.resize(target_size)
     img_array = np.array(img)
     img_array = img_array / 255.0  # Normalize the image
@@ -56,7 +54,7 @@ uploaded_image_path = browse_image()
 
 if uploaded_image_path:
     # Load the trained model
-    model = load_model(os.path.join(os.path.dirname(os.path.abspath(__file__)), "my_saved_model.h5"))
+    model = load_model(os.path.join(os.path.dirname(os.path.abspath(__file__)), "archive", "my_saved_model.h5"))
 
     # Define labels mapping
     labels = {0: 'Mild', 1: 'Moderate', 2: 'No_DR', 3:'Proliferate_DR', 4: 'Severe'}
@@ -71,4 +69,4 @@ if uploaded_image_path:
     plt.title(f"Predicted Class: {prediction}")
     plt.show()
 
-root.mainloop()
+root.destroy()  # hidden window only; mainloop() would block forever after the plot closes
