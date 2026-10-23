@@ -25,3 +25,6 @@ status.txt
 
 # Editor scratch files
 tempCodeRunnerFile.*
+
+# LoRA TensorBoard logs (long file names break Windows checkouts)
+lora_models/*/logs/
